@@ -21,17 +21,28 @@ package mekhq.gui;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
 import java.util.UUID;
 
+import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.RowFilter;
 import javax.swing.RowSorter;
@@ -106,14 +117,18 @@ public final class PersonnelTab extends CampaignGuiTab {
 
     public static final int PERSONNEL_VIEW_WIDTH = 500;
 
+    private static final String OPEN_SEARCH = "setSearchVisible";
+
     private JSplitPane splitPersonnel;
     private JTable personnelTable;
     private JComboBox<String> choicePerson;
     private JComboBox<String> choicePersonView;
     private JScrollPane scrollPersonnelView;
-
+    private JTextField searchField;
     private PersonnelTableModel personModel;
     private TableRowSorter<PersonnelTableModel> personnelSorter;
+    private String lastSearchText;
+    private JLabel searchLabel;
 
     PersonnelTab(CampaignGUI gui, String name) {
         super(gui, name);
@@ -238,13 +253,48 @@ public final class PersonnelTab extends CampaignGuiTab {
         changePersonnelView();
         personnelTable.getSelectionModel().addListSelectionListener(ev -> refreshPersonnelView());
 
+        // Initialize searchfield
+        searchLabel = new JLabel(resourceMap.getString("lblPersonSearch.text"));
+        searchField = new JTextField();
+
+        JPanel combinedPersonnelSearchPanel = new JPanel(new GridBagLayout());
+
+        gridBagConstraints = new GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.insets = new Insets(5, 5, 0, 0);
+        searchLabel.setVisible(false);
+
+        combinedPersonnelSearchPanel.add(searchLabel, gridBagConstraints);
+
+        gridBagConstraints = new GridBagConstraints();
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.fill = GridBagConstraints.BOTH;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.insets = new Insets(5, 5, 0, 0);
+
+        searchField.setVisible(false);
+
+        combinedPersonnelSearchPanel.add(searchField, gridBagConstraints);
+
+        gridBagConstraints = new GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.fill = GridBagConstraints.BOTH;
+        gridBagConstraints.weightx = 1.0;
+        gridBagConstraints.weighty = 1.0;
+
+        combinedPersonnelSearchPanel.add(new JScrollPane(personnelTable), gridBagConstraints);
+
         scrollPersonnelView = new JScrollPane();
         scrollPersonnelView.setMinimumSize(new java.awt.Dimension(PERSONNEL_VIEW_WIDTH, 600));
         scrollPersonnelView.setPreferredSize(new java.awt.Dimension(PERSONNEL_VIEW_WIDTH, 600));
         scrollPersonnelView.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPersonnelView.setViewportView(null);
 
-        splitPersonnel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(personnelTable),
+        splitPersonnel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, combinedPersonnelSearchPanel,
                 scrollPersonnelView);
         splitPersonnel.setOneTouchExpandable(true);
         splitPersonnel.setResizeWeight(1.0);
@@ -258,7 +308,81 @@ public final class PersonnelTab extends CampaignGuiTab {
         add(splitPersonnel, gridBagConstraints);
 
         filterPersonnel();
+
+        // Search field
+        Action openSearch = new AbstractAction()  {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                setSearchVisible(true);
+                if(isSearchVisible()) {
+                    searchField.requestFocusInWindow();
+                }
+            }
+        };
+        searchField.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyTyped(KeyEvent e) {
+                String searchText = searchField.getText();
+                if(searchText == null) {
+                    return;
+                }
+
+                if(searchText.equals(lastSearchText)) {
+                    return;
+                }
+                lastSearchText = searchText;
+                RowFilter<PersonnelTableModel, Integer> rowFilter= new RowFilter<PersonnelTableModel, Integer>() {
+
+                    @Override
+                    public boolean include(Entry<? extends PersonnelTableModel, ? extends Integer> entry) {
+                        if(searchField.isVisible()) {
+                            for(int i = 0; i < entry.getValueCount(); i++) {
+                                if(entry.getStringValue(i).contains(searchText)) {
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    }
+                };
+                personnelSorter.setRowFilter(rowFilter);
+            }
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if(e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    setSearchVisible(false);
+                    personnelSorter.setRowFilter(null);
+                }
+
+                if(e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    personnelTable.requestFocusInWindow();
+                    if(personnelTable.getRowCount() > 0) {
+                        personnelTable.setRowSelectionInterval(0, 0);
+                    }
+                }
+            }
+
+        });
+
+        getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK), OPEN_SEARCH);
+        getActionMap().put(OPEN_SEARCH, openSearch);
     }
+
+    private void setSearchVisible(boolean visibility) {
+        searchField.setVisible(visibility);
+        searchLabel.setVisible(visibility);
+        // When changing visibility the searchField won't show unless i click inside the PersonnelTab component,
+        // to bypass this i call updateUI which seems to resolve the issue.
+        updateUI();
+    }
+
+    private boolean isSearchVisible() {
+        return searchField.isVisible() && searchLabel.isVisible();
+    }
+
 
     /* For export */
     public JTable getPersonnelTable() {
