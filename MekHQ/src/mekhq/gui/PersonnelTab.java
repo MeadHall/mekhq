@@ -28,6 +28,7 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 import java.util.UUID;
 
@@ -48,6 +49,7 @@ import javax.swing.RowFilter;
 import javax.swing.RowSorter;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SortOrder;
+import javax.swing.SwingUtilities;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
 
@@ -117,7 +119,7 @@ public final class PersonnelTab extends CampaignGuiTab {
 
     public static final int PERSONNEL_VIEW_WIDTH = 500;
 
-    private static final String OPEN_SEARCH = "setSearchVisible";
+    private static final String OPEN_SEARCH = "openSearch";
 
     private JSplitPane splitPersonnel;
     private JTable personnelTable;
@@ -142,7 +144,7 @@ public final class PersonnelTab extends CampaignGuiTab {
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see mekhq.gui.CampaignGuiTab#initTab()
      */
     @Override
@@ -237,9 +239,8 @@ public final class PersonnelTab extends CampaignGuiTab {
                         // collapse
                         splitPersonnel.setDividerLocation(1.0);
                     }
-
                 }
-            }            
+            }
         });
         TableColumn column = null;
         for (int i = 0; i < PersonnelTableModel.N_COL; i++) {
@@ -315,6 +316,7 @@ public final class PersonnelTab extends CampaignGuiTab {
             @Override
             public void actionPerformed(ActionEvent e) {
                 setSearchVisible(true);
+                filterPersonnel();
                 if(isSearchVisible()) {
                     searchField.requestFocusInWindow();
                 }
@@ -323,30 +325,7 @@ public final class PersonnelTab extends CampaignGuiTab {
         searchField.addKeyListener(new KeyAdapter() {
             @Override
             public void keyTyped(KeyEvent e) {
-                String searchText = searchField.getText();
-                if(searchText == null) {
-                    return;
-                }
-
-                if(searchText.equals(lastSearchText)) {
-                    return;
-                }
-                lastSearchText = searchText;
-                RowFilter<PersonnelTableModel, Integer> rowFilter= new RowFilter<PersonnelTableModel, Integer>() {
-
-                    @Override
-                    public boolean include(Entry<? extends PersonnelTableModel, ? extends Integer> entry) {
-                        if(searchField.isVisible()) {
-                            for(int i = 0; i < entry.getValueCount(); i++) {
-                                if(entry.getStringValue(i).contains(searchText)) {
-                                    return true;
-                                }
-                            }
-                        }
-                        return false;
-                    }
-                };
-                personnelSorter.setRowFilter(rowFilter);
+                SwingUtilities.invokeLater(() -> filterPersonnel());
             }
 
             @Override
@@ -388,14 +367,14 @@ public final class PersonnelTab extends CampaignGuiTab {
     public JTable getPersonnelTable() {
         return personnelTable;
     }
-    
+
     public PersonnelTableModel getPersonModel() {
         return personModel;
     }
 
     /*
      * (non-Javadoc)
-     * 
+     *
      * @see mekhq.gui.CampaignGuiTab#refreshAll()
      */
     @Override
@@ -475,7 +454,9 @@ public final class PersonnelTab extends CampaignGuiTab {
     public void filterPersonnel() {
         RowFilter<PersonnelTableModel, Integer> personTypeFilter = null;
         final int nGroup = choicePerson.getSelectedIndex();
-        personTypeFilter = new RowFilter<PersonnelTableModel, Integer>() {
+
+        List<RowFilter<PersonnelTableModel, Integer>> filters = new ArrayList<>();
+        filters.add(new RowFilter<PersonnelTableModel, Integer>() {
             @Override
             public boolean include(Entry<? extends PersonnelTableModel, ? extends Integer> entry) {
                 PersonnelTableModel personModel = entry.getModel();
@@ -499,7 +480,7 @@ public final class PersonnelTab extends CampaignGuiTab {
                         && !person.isPrisoner()) {
                     return person.isActive();
                 } else if (nGroup == PG_DEPENDENT) {
-                    return person.isDependent() == true;
+                    return person.isDependent();
                 } else if (nGroup == PG_RETIRE) {
                     return person.getStatus() == Person.S_RETIRED;
                 } else if (nGroup == PG_MIA) {
@@ -511,8 +492,26 @@ public final class PersonnelTab extends CampaignGuiTab {
                 }
                 return false;
             }
-        };
-        personnelSorter.setRowFilter(personTypeFilter);
+        });
+        if(searchField.getText().length() > 0 && isSearchVisible()) {
+            filters.add(new RowFilter<PersonnelTableModel, Integer>() {
+
+                @Override
+                public boolean include(Entry<? extends PersonnelTableModel, ? extends Integer> entry) {
+                    final String searchTerm= searchField.getText();
+                    Person person = entry.getModel().getPerson(entry.getIdentifier());
+
+                    if(person.getFullName().contains(searchTerm)) {
+                            return true;
+                    }else if(person.getCallsign().contains(searchTerm)) {
+                            return true;
+                    }else {
+                        return false;
+                    }
+                }
+            });
+        }
+        personnelSorter.setRowFilter(RowFilter.andFilter(filters));
     }
 
     private void changePersonnelView() {
@@ -936,27 +935,27 @@ public final class PersonnelTab extends CampaignGuiTab {
         changePersonnelView();
         personnelListScheduler.schedule();
     }
-    
+
     @Subscribe
     public void handle(DeploymentChangedEvent ev) {
         filterPersonnelScheduler.schedule();
     }
-    
+
     @Subscribe
     public void handle(PersonChangedEvent ev) {
         personnelListScheduler.schedule();
     }
-    
+
     @Subscribe
     public void handle(PersonNewEvent ev) {
         personnelListScheduler.schedule();
     }
-    
+
     @Subscribe
     public void handle(PersonRemovedEvent ev) {
         personnelListScheduler.schedule();
     }
-    
+
     @Subscribe
     public void handle(PersonLogEvent ev) {
         refreshPersonnelView();
@@ -976,7 +975,7 @@ public final class PersonnelTab extends CampaignGuiTab {
     public void handle(PartWorkEvent ev) {
         filterPersonnelScheduler.schedule();
     }
-    
+
     @Subscribe
     public void handle(OvertimeModeEvent ev) {
         filterPersonnelScheduler.schedule();
