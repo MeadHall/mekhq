@@ -315,11 +315,11 @@ public final class PersonnelTab extends CampaignGuiTab {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                setSearchVisible(true);
-                filterPersonnel();
-                if(isSearchVisible()) {
-                    searchField.requestFocusInWindow();
+                if(!isSearchVisible()) {
+                    setSearchVisible(true);
                 }
+                filterPersonnel();
+                searchField.requestFocusInWindow();
             }
         };
         searchField.addKeyListener(new KeyAdapter() {
@@ -451,6 +451,9 @@ public final class PersonnelTab extends CampaignGuiTab {
         }
     }
 
+    /**
+     * Filters personnel list after type, view and search term.
+     */
     public void filterPersonnel() {
         RowFilter<PersonnelTableModel, Integer> personTypeFilter = null;
         final int nGroup = choicePerson.getSelectedIndex();
@@ -502,9 +505,13 @@ public final class PersonnelTab extends CampaignGuiTab {
                     Person person = entry.getModel().getPerson(entry.getIdentifier());
 
                     if(person.getFullName().contains(searchTerm)) {
-                            return true;
+                        return true;
                     }else if(person.getCallsign().contains(searchTerm)) {
-                            return true;
+                        return true;
+                    }else if(person.getSkillSummary().contains(searchTerm)) {
+                        return true;
+                    }else if(person.getPrimaryRoleDesc().contains(searchTerm)) {
+                        return true;
                     }else {
                         return false;
                     }
