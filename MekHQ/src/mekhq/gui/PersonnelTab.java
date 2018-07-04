@@ -35,6 +35,7 @@ import java.util.UUID;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.DefaultComboBoxModel;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -129,8 +130,8 @@ public final class PersonnelTab extends CampaignGuiTab {
     private JTextField searchField;
     private PersonnelTableModel personModel;
     private TableRowSorter<PersonnelTableModel> personnelSorter;
-    private String lastSearchText;
     private JLabel searchLabel;
+    private JButton closeSearchButton;
 
     PersonnelTab(CampaignGUI gui, String name) {
         super(gui, name);
@@ -278,16 +279,29 @@ public final class PersonnelTab extends CampaignGuiTab {
         searchField.setVisible(false);
 
         combinedPersonnelSearchPanel.add(searchField, gridBagConstraints);
+        // Test button with image icon.
+        closeSearchButton = new JButton("close");
+
+        gridBagConstraints = new GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.insets = new Insets(5, 5, 0, 0);
+        gridBagConstraints.weightx = 0.4;
+        gridBagConstraints.anchor = GridBagConstraints.LINE_END;
+        closeSearchButton.setVisible(false);
+        combinedPersonnelSearchPanel.add(closeSearchButton, gridBagConstraints);
+
 
         gridBagConstraints = new GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
-        gridBagConstraints.gridwidth = 2;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.fill = GridBagConstraints.BOTH;
         gridBagConstraints.weightx = 1.0;
         gridBagConstraints.weighty = 1.0;
 
         combinedPersonnelSearchPanel.add(new JScrollPane(personnelTable), gridBagConstraints);
+
 
         scrollPersonnelView = new JScrollPane();
         scrollPersonnelView.setMinimumSize(new java.awt.Dimension(PERSONNEL_VIEW_WIDTH, 600));
@@ -353,9 +367,11 @@ public final class PersonnelTab extends CampaignGuiTab {
     private void setSearchVisible(boolean visibility) {
         searchField.setVisible(visibility);
         searchLabel.setVisible(visibility);
+        closeSearchButton.setVisible(visibility);
         // When changing visibility the searchField won't show unless i click inside the PersonnelTab component,
         // to bypass this i call updateUI which seems to resolve the issue.
-        updateUI();
+        revalidate();
+        repaint();
     }
 
     private boolean isSearchVisible() {
